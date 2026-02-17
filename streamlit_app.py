@@ -4,104 +4,132 @@ import plotly.express as px
 import os
 
 # 1. Page Configuration
-st.set_page_config(page_title="SheehyAllAround", layout="centered")
+st.set_page_config(page_title="SheehyAllAround", layout="centered", page_icon="🤸")
 
 # 2. Custom Styling
 st.markdown("""
     <style>
-    .annabelle-header { color: #FF69B4; font-size: 26px; font-weight: bold; }
-    .azalea-header { color: #9370DB; font-size: 26px; font-weight: bold; }
-    .ansel-header { color: #008080; font-size: 26px; font-weight: bold; }
+    .annabelle-header { color: #FF69B4; font-size: 28px; font-weight: bold; }
+    .azalea-header { color: #9370DB; font-size: 28px; font-weight: bold; }
+    .ansel-header { color: #008080; font-size: 28px; font-weight: bold; }
+    .metric-card { background-color: #f0f2f6; padding: 10px; border-radius: 10px; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Data Loading & Cleaning
+# 3. Robust Data Loading
 @st.cache_data
 def load_data():
-    if os.path.exists("gymnastics_history.csv"):
-        try:
-            df = pd.read_csv("gymnastics_history.csv")
-            
-            # --- STEP 1: Fix Column Headers ---
-            # Remove invisible spaces first
-            df.columns = df.columns.str.strip()
-            
-            # Smart Rename: Find ANY column ending in "_MMS" and rename it to 'Gymnast'
-            # This handles cases where the header might be "Annabelle_MMS" OR "Azalea_MMS"
-            for col in df.columns:
-                if str(col).endswith('_MMS'):
-                    df.rename(columns={col: 'Gymnast'}, inplace=True)
-                    break 
+    file_path = "cleaned_gymnastics.csv"
+    if not os.path.exists(file_path):
+        return None
 
-            # Standard Rename Map for everything else
-            rename_map = {
-                'Vault': 'VT', 'Bars': 'UB', 'Beam': 'BB', 'Floor': 'FX',
-                'Pommel': 'PH', 'Rings': 'SR', 'PBar': 'PB', 'HighBar': 'HB',
-                'All Around': 'AA', 'Total': 'AA', 'Score': 'AA', 'AA': 'AA',
-                'Name': 'Gymnast', 'Athlete': 'Gymnast'
-            }
-            df.rename(columns=rename_map, inplace=True)
-            
-            # --- STEP 2: Clean the Row Values ---
-            # If the rows say "Azalea_MMS", strip the "_MMS" so it just says "Azalea"
-            if 'Gymnast' in df.columns:
-                df['Gymnast'] = df['Gymnast'].astype(str).str.replace('_MMS', '', regex=False)
-                df['Gymnast'] = df['Gymnast'].str.strip() # Remove spaces
+    try:
+        df = pd.read_csv(file_path)
+        
+        # --- CLEANING STEP 1: Standardize Column Names ---
+        df.columns = df.columns.str.strip() # Remove hidden spaces
+        
+        # Map ALL possible variations to the standard short codes
+        rename_map = {
+            'Vault': 'VT', 'Bars': 'UB', 'Beam': 'BB', 'Floor': 'FX',
+            'Pommel': 'PH', 'Rings': 'SR', 'PBar': 'PB', 'PBars': 'PB', 'HighBar': 'HB', 'HiBar': 'HB',
+            'All Around': 'AA', 'Total': 'AA', 'Score': 'AA',
+            'Meet Ranking': 'Meet_Rank', 'Rank': 'Meet_Rank'
+        }
+        df.rename(columns=rename_map, inplace=True)
 
-            # --- STEP 3: Fallback ---
-            # If Gymnast column is totally missing, assume it's Annabelle (prevent crash)
-            if 'Gymnast' not in df.columns:
-                df['Gymnast'] = 'Annabelle'
-            
-            # Force AA to be numeric
-            if 'AA' in df.columns:
-                df['AA'] = pd.to_numeric(df['AA'], errors='coerce')
-            
-            # Handle Date
-            if 'Date' in df.columns:
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-                df = df.sort_values(by='Date')
-                
-            return df
-        except Exception as e:
-            st.error(f"Error reading CSV: {e}")
-            return None
-    return None
+        # --- CLEANING STEP 2: Force Numbers ---
+        # List of columns that MUST be numbers
+        score_cols = ['VT', 'UB', 'BB', 'FX', 'PH', 'SR', 'PB', 'HB', 'AA']
+        
+        for col in score_cols:
+            if col in df.columns:
+                # Coerce errors: turns "9.500 (1)" or "text" into NaN, but keeps "9.5"
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # --- CLEANING STEP 3: Handle Dates ---
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df = df.sort_values(by='Date')
+
+        return df
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None
 
 df = load_data()
 
-# 4. Main UI
+# 4. Main Dashboard UI
 st.title("🏆 Sheehy All-Around")
 
+if df is None:
+    st.warning("⚠️ No data file found (`cleaned_gymnastics.csv`). Please run the scraper first.")
+    st.stop()
+
+# TABS
 tab1, tab2, tab3 = st.tabs(["Annabelle", "Azalea", "Ansel"])
 
-# Helper function
 def show_gymnast_tab(name, color, events, header_class):
     st.markdown(f'<p class="{header_class}">{name}</p>', unsafe_allow_html=True)
-    if df is not None:
-        # Filter logic: Look for name "Annabelle" inside the cleaned Gymnast column
-        data = df[df['Gymnast'].str.contains(name, case=False, na=False)].copy()
+    
+    # Filter for the specific gymnast
+    # We use 'str.contains' to be safe (matches "Ansel" in "Ansel Sheehy")
+    subset = df[df['Gymnast'].astype(str).str.contains(name, case=False, na=False)].copy()
+    
+    if not subset.empty:
+        # Get the Most Recent Meet
+        latest = subset.iloc[-1]
         
-        if not data.empty:
-            # Metrics Row (Most Recent Meet)
-            latest = data.iloc[-1]
-            cols = st.columns(len(events))
-            for i, (event_code, icon) in enumerate(events.items()):
-                val = latest.get(event_code, "-")
-                cols[i].metric(event_code, val)
-            
-            # Line Chart
-            st.subheader("Season Progress")
-            chart_data = data.dropna(subset=['AA'])
-            
-            if not chart_data.empty:
-                fig = px.line(chart_data, x='Date', y='AA', markers=True, 
-                              color_discrete_sequence=[color])
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No All-Around scores available for the chart yet.")
+        # --- TOP ROW: Context ---
+        m1, m2 = st.columns([2, 1])
+        m1.info(f"📍 **Latest Meet:** {latest.get('Meet', 'Unknown')} ({latest.get('Date', '').date()})")
+        
+        # Meet Rank Badge (if available)
+        rank = latest.get('Meet_Rank', '')
+        total = latest.get('Meet_Rank_Total', '')
+        if pd.notna(rank) and str(rank) != "" and str(rank) != "0" and str(rank) != "nan":
+            rank_display = f"{int(float(rank))} / {int(float(total))}" if pd.notna(total) and total != "" else f"{int(float(rank))}"
+            m2.metric("🏆 Meet Rank", rank_display)
         else:
-            st.warning(f"No data found for {name}.")
+            m2.write("") # Spacer
+
+        # --- SCORES ROW ---
+        # Dynamic columns based on number of events
+        cols = st.columns(len(events))
+        for i, (evt_code, icon) in enumerate(events.items()):
+            val = latest.get(evt_code, None)
+            
+            # Formatting: If it's a number, format to 3 decimals. If NaN, show "-"
+            if pd.notna(val):
+                display_val = f"{val:.3f}"
+            else:
+                display_val = "-"
+            
+            cols[i].metric(f"{evt_code}", display_val, icon)
+            
+        # --- AA SCORE ---
+        aa_val = latest.get('AA', None)
+        if pd.notna(aa_val):
+            st.metric("All-Around (AA)", f"{aa_val:.3f}")
+            
+        # --- CHART ---
+        st.subheader("📈 Season Progress")
+        chart_data = subset.dropna(subset=['AA'])
+        if not chart_data.empty:
+            fig = px.line(chart_data, x='Date', y='AA', markers=True, 
+                          title=f"{name}'s All-Around Score Trend",
+                          color_discrete_sequence=[color])
+            fig.update_layout(yaxis_title="Score", xaxis_title="Date")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Not enough data points for a progress chart yet.")
+
+        # --- DEBUG: RAW DATA ---
+        with st.expander(f"🔍 Inspect Raw Data for {name}"):
+            st.dataframe(subset)
+
+    else:
+        st.info(f"No data found for {name}. Check the CSV or spelling!")
 
 # --- ANNABELLE (Pink) ---
 with tab1:
