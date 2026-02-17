@@ -3,107 +3,96 @@ import pandas as pd
 import plotly.express as px
 import os
 
-# 1. Page Configuration
 st.set_page_config(page_title="SheehyAllAround", layout="centered")
 
-# 2. Custom Styling
-st.markdown("""
-    <style>
-    .annabelle-header { color: #FF69B4; font-size: 26px; font-weight: bold; }
-    .azalea-header { color: #9370DB; font-size: 26px; font-weight: bold; }
-    .ansel-header { color: #008080; font-size: 26px; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
+st.title("🏆 Sheehy All-Around (Debug Mode)")
 
-# 3. Robust Data Loading Logic
-@st.cache_data
-def load_data():
-    if os.path.exists("gymnastics_history.csv"):
-        try:
-            df = pd.read_csv("gymnastics_history.csv")
-            
-            # --- CRITICAL FIX: Clean Column Names ---
-            # 1. Remove hidden spaces (e.g. "AA " -> "AA")
-            df.columns = df.columns.str.strip()
-            
-            # 2. Rename common variations to standard "AA"
-            rename_map = {
-                'All Around': 'AA',
-                'AllAround': 'AA',
-                'Total': 'AA',
-                'Score': 'AA',
-                'aa': 'AA'
-            }
-            df.rename(columns=rename_map, inplace=True)
-            
-            # 3. If AA is completely missing, create it to prevent crash
-            if 'AA' not in df.columns:
-                df['AA'] = None
-            else:
-                # Force AA to be numeric (turn "36.500(1)" into NaN)
-                df['AA'] = pd.to_numeric(df['AA'], errors='coerce')
-            
-            # 4. Handle Date
-            if 'Date' in df.columns:
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-                df = df.sort_values(by='Date')
-                
-            return df
-        except Exception as e:
-            st.error(f"Error reading CSV: {e}")
-            return None
-    return None
+# 1. Load Data Safely
+if os.path.exists("gymnastics_history.csv"):
+    try:
+        # Read the file
+        df = pd.read_csv("gymnastics_history.csv")
+        
+        # --- DEBUG SECTION: Show us the raw data ---
+        st.subheader("1. Raw Data Preview")
+        st.write("Here are the column names found in your file:")
+        st.code(df.columns.tolist())  # This prints the EXACT list of headers
+        
+        st.write("Here is the first few rows of data:")
+        st.dataframe(df.head())       # This shows the actual table
+        
+        # --- ATTEMPT TO FIX HEADERS ---
+        # Strip invisible spaces
+        df.columns = df.columns.str.strip()
+        
+        # Rename common variations to "AA"
+        rename_map = {
+            'All Around': 'AA', 'AllAround': 'AA', 'Total': 'AA', 
+            'Score': 'AA', 'aa': 'AA', 'Total Score': 'AA'
+        }
+        df.rename(columns=rename_map, inplace=True)
+        
+        # Force AA to be numbers
+        if 'AA' in df.columns:
+            df['AA'] = pd.to_numeric(df['AA'], errors='coerce')
+        
+        # Handle Date
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df = df.sort_values(by='Date')
 
-df = load_data()
+    except Exception as e:
+        st.error(f"Error loading CSV: {e}")
+        st.stop()
+else:
+    st.error("File 'gymnastics_history.csv' not found.")
+    st.stop()
 
-# 4. Main UI
-st.title("🏆 Sheehy All-Around")
-
-# Debug Option: Uncomment to see your raw column names on screen if it fails again
-# if df is not None:
-#     st.write("Debug - Columns Found:", df.columns.tolist())
-
+# 2. Tabs
 tab1, tab2, tab3 = st.tabs(["Annabelle", "Azalea", "Ansel"])
 
-# Helper function to prevent repetitive code
-def show_gymnast_tab(name, color, events, header_class):
-    st.markdown(f'<p class="{header_class}">{name}</p>', unsafe_allow_html=True)
-    if df is not None:
-        # Filter data for this gymnast
-        data = df[df['Gymnast'].str.contains(name, case=False, na=False)].copy()
+def show_tab(name, color, events):
+    st.header(f"{name}")
+    
+    # Filter for the gymnast
+    # We use case=False so "annabelle" matches "Annabelle"
+    subset = df[df['Gymnast'].str.contains(name, case=False, na=False)].copy()
+    
+    if not subset.empty:
+        # Show Metrics
+        latest = subset.iloc[-1]
+        cols = st.columns(len(events))
+        for i, (evt, icon) in enumerate(events.items()):
+            # Use .get() so it never crashes if a column is missing
+            val = latest.get(evt, "-")
+            cols[i].metric(evt, val)
         
-        if not data.empty:
-            # Metrics Row (Most Recent Meet)
-            latest = data.iloc[-1]
-            cols = st.columns(len(events))
-            for i, (event_code, icon) in enumerate(events.items()):
-                # Use .get() to safely grab data even if column is missing
-                cols[i].metric(event_code, latest.get(event_code, "-"), icon)
-            
-            # Line Chart
-            st.subheader("Season Progress")
-            # Only plot if we actually have valid AA numbers
-            chart_data = data.dropna(subset=['AA'])
-            
+        # Show Chart ONLY if AA exists
+        if 'AA' in subset.columns:
+            # Drop empty rows
+            chart_data = subset.dropna(subset=['AA'])
             if not chart_data.empty:
                 fig = px.line(chart_data, x='Date', y='AA', markers=True, 
-                              color_discrete_sequence=[color])
+                              color_discrete_sequence=[color], title=f"{name}'s Progress")
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("No All-Around scores available for the chart yet.")
+                st.info(f"Found data for {name}, but the 'AA' column has no valid numbers.")
         else:
-            st.warning(f"No data found for {name}.")
+            st.warning("⚠️ Could not find an 'AA' column. Check the 'Raw Data Preview' above to see what it's named!")
+            
+        # Show the table for this kid specifically
+        with st.expander(f"See Raw Data for {name}"):
+            st.dataframe(subset)
+            
+    else:
+        st.warning(f"No rows found with Gymnast name '{name}'")
 
-# --- ANNABELLE (Pink) ---
+# --- DRAW TABS ---
 with tab1:
-    events_girls = {'VT': '🏃‍♀️', 'UB': '⚖️', 'BB': '🪵', 'FX': '🤸‍♀️'}
-    show_gymnast_tab("Annabelle", "#FF69B4", events_girls, "annabelle-header")
+    show_tab("Annabelle", "#FF69B4", {'VT':'🏃‍♀️', 'UB':'⚖️', 'BB':'🪵', 'FX':'🤸‍♀️'})
 
-# --- AZALEA (Purple) ---
 with tab2:
-    show_gymnast_tab("Azalea", "#9370DB", events_girls, "azalea-header")
+    show_tab("Azalea", "#9370DB", {'VT':'🏃‍♀️', 'UB':'⚖️', 'BB':'🪵', 'FX':'🤸‍♀️'})
 
-# --- ANSEL (Teal) ---
 with tab3:
-    events_boys = {'FX': '🤸‍♂️', 'PH': '🐎', 'SR': '⭕', 'VT': '🏃‍♂️', 'PB': '⏸️', 'HB': '💈'}
-    show_gymnast_tab("Ansel", "#008080", events_boys, "ansel-header")
+    show_tab("Ansel", "#008080", {'FX':'🤸‍♂️', 'PH':'🐎', 'SR':'⭕', 'VT':'🏃‍♂️', 'PB':'⏸️', 'HB':'💈'})
