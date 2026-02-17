@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime
 
-# Folder where you drop ALL html files (Ansel's, Annabelle's, Azalea's)
+# Folder where you drop ALL html files
 HTML_FOLDER = "ansel_history"
 CSV_FILE = "cleaned_gymnastics.csv"
 
@@ -29,19 +29,57 @@ def parse_html_file(file_path):
         print("   ⚠️ Could not identify gymnast from title. Skipping.")
         return None
 
-    # 2. EXTRACT METADATA
+    # 2. EXTRACT MEET NAME & DATE
     meet_name = "Unknown Meet"
     meet_date = datetime.now().strftime('%Y-%m-%d')
     
     if soup.title:
-        parts = soup.title.get_text().split(' - ')
+        # Title format: "Ansel Sheehy - 2026 Mas Watanabe, CA 02/13/2026 - ..."
+        title_text = soup.title.get_text()
+        parts = title_text.split(' - ')
         if len(parts) >= 3:
             meet_name = parts[1].split(',')[0].strip()
-            date_match = re.search(r"(\d{2}/\d{2}/\d{4})", soup.title.get_text())
+            # Extract Date
+            date_match = re.search(r"(\d{2}/\d{2}/\d{4})", title_text)
             if date_match:
                 meet_date = datetime.strptime(date_match.group(1), '%m/%d/%Y').strftime('%Y-%m-%d')
 
-    # 3. EXTRACT MEET RANKING
+    # 3. EXTRACT LEVEL, DIVISION, SESSION
+    # Look for list items like <li><span class="title">Level: </span>4D1</li>
+    level = ""
+    division = ""
+    session = ""
+    
+    # We search all list items <li> because MSO puts this info in a 'card'
+    for li in soup.find_all('li'):
+        text = li.get_text(strip=True)
+        
+        # LEVEL & DIVISION
+        if "Level:" in text:
+            # text looks like "Level: 4D1"
+            full_level_str = text.replace("Level:", "").strip()
+            
+            # SPLIT LOGIC: often "4D1" means Level 4, Div D1
+            # Let's try to be smart about it.
+            if "D" in full_level_str and full_level_str[0].isdigit():
+                # Split "4D1" into Level="4", Div="D1"
+                parts = full_level_str.split('D', 1)
+                level = parts[0]
+                division = "D" + parts[1]
+            else:
+                # Just keep the whole thing as Level if unsure
+                level = full_level_str
+        
+        # SESSION (Sometimes labeled "Session:" or found in specific spans)
+        if "Session:" in text:
+            session = text.replace("Session:", "").strip()
+        
+        # DIVISION (Sometimes explicitly labeled)
+        if "Division:" in text or "Div:" in text:
+            val = text.replace("Division:", "").replace("Div:", "").strip()
+            if val: division = val
+
+    # 4. EXTRACT MEET RANKING (e.g. "36th out of 152")
     meet_rank = ""
     meet_total = ""
     for li in soup.find_all('li'):
@@ -57,7 +95,7 @@ def parse_html_file(file_path):
                     meet_total = match.group(1)
             break
 
-    # 4. EXTRACT SCORES
+    # 5. EXTRACT SCORES
     scores = {}
     table = soup.find('table', class_='table-condensed')
     if table:
@@ -73,7 +111,7 @@ def parse_html_file(file_path):
                     val = float(score_span.get_text(strip=True))
                     rank = rank_span.get_text(strip=True) if rank_span else ""
                     
-                    # Unified Mapping for Boys AND Girls
+                    # Unified Mapping
                     map_evt = {
                         'Floor': 'FX', 'Pommel': 'PH', 'Rings': 'SR', 
                         'Vault': 'VT', 'PBars': 'PB', 'HiBar': 'HB', 
@@ -89,10 +127,14 @@ def parse_html_file(file_path):
         print("   ⚠️ No scores found in table.")
         return None
 
+    # Construct Record
     return {
         'Date': meet_date,
         'Gymnast': gymnast_name,
         'Meet': meet_name,
+        'Session': session,
+        'Level': level,
+        'Division': division,
         'Meet_Rank': meet_rank,
         'Meet_Rank_Total': meet_total,
         **scores
@@ -103,7 +145,7 @@ def main():
         print(f"❌ Folder '{HTML_FOLDER}' not found.")
         return
 
-    # Load existing CSV
+    # Load existing CSV or create new
     if os.path.exists(CSV_FILE):
         df = pd.read_csv(CSV_FILE)
     else:
@@ -111,7 +153,7 @@ def main():
 
     new_records = []
     
-    # Process EVERY html file in the folder
+    # Process EVERY html file
     for filename in os.listdir(HTML_FOLDER):
         if filename.endswith(".html") or filename.endswith(".htm"):
             data = parse_html_file(os.path.join(HTML_FOLDER, filename))
@@ -121,18 +163,22 @@ def main():
     if new_records:
         new_df = pd.DataFrame(new_records)
         
-        # Merge with existing data
-        # We use 'combine_first' logic: prefer the new data (with Meet Rank) over old data
+        # Merge logic:
+        # We assume the HTML files are the "Source of Truth". 
+        # So we append them to the existing CSV, then deduplicate keeping the NEW ones.
         updated_df = pd.concat([df, new_df], ignore_index=True)
         
-        # Deduplicate: If we have the same Gymnast/Meet/Score, keep the LAST one (the one we just parsed)
-        # This effectively "upgrades" your old rows with the new Meet Rank data
+        # Deduplicate based on Gymnast + Meet + AA score
+        # keep='last' ensures the rows we just parsed (with Level/Div) replace the old ones
         updated_df.drop_duplicates(subset=['Gymnast', 'Meet', 'AA'], keep='last', inplace=True)
         
+        # Fill NaNs with blanks/zeros so the CSV looks clean
+        updated_df.fillna("", inplace=True)
+        
         updated_df.to_csv(CSV_FILE, index=False)
-        print(f"🎉 Success! Processed {len(new_records)} files. Historical data updated.")
+        print(f"🎉 Success! Updated {len(new_records)} meets with Level, Division, and Session info.")
     else:
-        print("❌ No valid HTML files found.")
+        print("❌ No HTML files found to process.")
 
 if __name__ == "__main__":
     main()
