@@ -1,3 +1,4 @@
+from io import StringIO
 import pandas as pd
 import requests
 import re
@@ -12,7 +13,7 @@ def get_all_tables(url, name):
     print(f"Scraping all data for {name}...")
     headers = {'User-Agent': 'Mozilla/5.0'}
     response = requests.get(url, headers=headers)
-    all_tables = pd.read_html(response.text)
+    all_tables = pd.read_html(StringIO(response.text))
     
     valid_dfs = []
     for df in all_tables:
