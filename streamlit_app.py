@@ -1,64 +1,80 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+import os
 
-# Page setup for mobile optimization
+Set page to mobile-friendly centered layout
 st.set_page_config(page_title="SheehyAllAround", layout="centered")
 
-# Custom Styles
+Custom CSS for the Pink and Purple themes
 st.markdown("""
-    <style>
-    .annabelle-txt { color: #FF69B4; font-weight: bold; }
-    .azalea-txt { color: #9370DB; font-weight: bold; }
-    .ansel-txt { color: #008080; font-weight: bold; }
-    .metric-label { font-size: 0.8em; color: #666; }
-    </style>
-    """, unsafe_allow_html=True)
 
-st.title("🤸‍♂️ Sheehy All-Around")
+<style>
+     annabelle-header { color: #FF69B4; font-size: 24px; font-weight: bold; }
+     azalea-header { color: #9370DB; font-size: 24px; font-weight: bold; }
+</style>
 
-# Creating the 5 Tabs
-t1, t2, t3, t4, t5 = st.tabs(["Annabelle", "Azalea", "Ansel", "BSE Men's", "Bayshore Elite"])
+""", unsafe_allow_html=True)
 
-# --- TAB 1: ANNABELLE (L3 Women's) ---
-with t1:
-    st.markdown('<h2 class="annabelle-txt">Annabelle - Level 3</h2>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("VT", "---", "🏃‍♀️")
-    c2.metric("UB", "---", "⚖️")
-    c3.metric("BB", "---", "🪵")
-    c4.metric("FX", "---", "🤸‍♀️")
-    st.progress(0, text="Season PB Progress (AA)")
+def load_data():
+    if os.path.exists("gymnastics_history.csv"):
+        df = pd.read_csv("gymnastics_history.csv")
+        # Ensure the date column is treated as a real date for the charts
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            df = df.sort_values(by='Date')
+        return df
+    return None
 
-# --- TAB 2: AZALEA (L4 Women's) ---
-with t2:
-    st.markdown('<h2 class="azalea-txt">Azalea - Level 4</h2>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("VT", "---", "🏃‍♀️")
-    c2.metric("UB", "---", "⚖️")
-    c3.metric("BB", "---", "🪵")
-    c4.metric("FX", "---", "🤸‍♀️")
-    st.progress(0, text="Season PB Progress (AA)")
+df = load_data()
 
-# --- TAB 3: ANSEL (L4 Men's) ---
-with t3:
-    st.markdown('<h2 class="ansel-txt">Ansel - Level 4 (Mens)</h2>', unsafe_allow_html=True)
-    row1 = st.columns(3)
-    row2 = st.columns(3)
-    row1[0].metric("FX", "---", "🤸‍♂️")
-    row1[1].metric("PH", "---", "🐎")
-    row1[2].metric("SR", "---", "⭕")
-    row2[0].metric("VT", "---", "🏃‍♂️")
-    row2[1].metric("PB", "---", "⏸️")
-    row2[2].metric("HB", "---", "💈")
+st.title("🏆 Sheehy All-Around")
 
-# --- TAB 4: BSE MEN'S TEAM ---
-with t4:
-    st.header("BSE Men's Team Results")
-    st.caption("Tracking session averages and team rank for the Boys program.")
-    st.info("Live data will populate here during Ansel's meets.")
+Create Tabs for the Girls
+tab1, tab2 = st.tabs(["Annabelle (Pink)", "Azalea (Purple)"])
 
-# --- TAB 5: BAYSHORE ELITE TEAM ---
-with t5:
-    st.header("Bayshore Elite Team Results")
-    st.caption("Tracking session averages and team rank for the Girls program.")
-    st.info("Live data will populate here during Annabelle or Azalea's meets.")
+--- ANNABELLE SECTION ---
+with tab1:
+    st.markdown('<p class="annabelle-header">Annabelle - Level 3</p>', unsafe_allow_html=True)
+    if df is not None:
+        girl_df = df[df['Gymnast'].str.contains("Annabelle", na=False)]
+        if not girl_df.empty:
+            # Metric Cards for most recent meet
+            latest = girl_df.iloc[-1]
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("VT", latest.get('VT', 0))
+            col2.metric("UB", latest.get('UB', 0))
+            col3.metric("BB", latest.get('BB', 0))
+            col4.metric("FX", latest.get('FX', 0))
+            
+            # Line Chart for All-Around (AA) Progress
+            st.subheader("Season AA Progress")
+            fig = px.line(girl_df, x='Date', y='AA', markers=True,
+                        labels={'AA': 'All-Around Score'},
+                        color_discrete_sequence=['#FF69B4'])
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.write("No data found for Annabelle.")
+
+--- AZALEA SECTION ---
+with tab2:
+....st.markdown('<p class="azalea-header">Azalea - Level 4</p>', unsafe_allow_html=True)
+....if df is not None:
+........girl_df = df[df['Gymnast'].str.contains("Azalea", na=False)]
+........if not girl_df.empty:
+............# Metric Cards for most recent meet
+............latest = girl_df.iloc[-1]
+............col1, col2, col3, col4 = st.columns(4)
+............col1.metric("VT", latest.get('VT', 0))
+............col2.metric("UB", latest.get('UB', 0))
+............col3.metric("BB", latest.get('BB', 0))
+............col4.metric("FX", latest.get('FX', 0))
+............
+............# Line Chart for All-Around (AA) Progress
+............st.subheader("Season AA Progress")
+............fig = px.line(girl_df, x='Date', y='AA', markers=True,
+........................labels={'AA': 'All-Around Score'},
+........................color_discrete_sequence=['#9370DB'])
+............st.plotly_chart(fig, use_container_width=True)
+........else:
+............st.write("No data found for Azalea.")
