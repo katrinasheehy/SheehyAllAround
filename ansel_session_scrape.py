@@ -6,7 +6,7 @@ import re
 import os
 
 def clean_and_split(val):
-if pd.isna(val) or not isinstance(val, str):
+  if pd.isna(val) or not isinstance(val, str):
 return val, None
 match = re.match(r"(\d+.\d+)\s*(.*)", str(val))
 if match:
