@@ -22,22 +22,38 @@ def load_data():
         try:
             df = pd.read_csv("gymnastics_history.csv")
             
-            # --- CRITICAL FIX: Standardize Column Names ---
-            # Map full words to the short codes the app uses
+            # --- STEP 1: Fix Column Headers ---
+            # Remove invisible spaces first
+            df.columns = df.columns.str.strip()
+            
+            # Smart Rename: Find ANY column ending in "_MMS" and rename it to 'Gymnast'
+            # This handles cases where the header might be "Annabelle_MMS" OR "Azalea_MMS"
+            for col in df.columns:
+                if str(col).endswith('_MMS'):
+                    df.rename(columns={col: 'Gymnast'}, inplace=True)
+                    break 
+
+            # Standard Rename Map for everything else
             rename_map = {
-                'Vault': 'VT',
-                'Bars': 'UB',
-                'Beam': 'BB',
-                'Floor': 'FX',
-                'Pommel': 'PH',
-                'Rings': 'SR',
-                'PBar': 'PB',
-                'HighBar': 'HB',
-                'AA': 'AA' 
+                'Vault': 'VT', 'Bars': 'UB', 'Beam': 'BB', 'Floor': 'FX',
+                'Pommel': 'PH', 'Rings': 'SR', 'PBar': 'PB', 'HighBar': 'HB',
+                'All Around': 'AA', 'Total': 'AA', 'Score': 'AA', 'AA': 'AA',
+                'Name': 'Gymnast', 'Athlete': 'Gymnast'
             }
             df.rename(columns=rename_map, inplace=True)
             
-            # Force AA to be numeric (turns "36.500(1)" into NaN)
+            # --- STEP 2: Clean the Row Values ---
+            # If the rows say "Azalea_MMS", strip the "_MMS" so it just says "Azalea"
+            if 'Gymnast' in df.columns:
+                df['Gymnast'] = df['Gymnast'].astype(str).str.replace('_MMS', '', regex=False)
+                df['Gymnast'] = df['Gymnast'].str.strip() # Remove spaces
+
+            # --- STEP 3: Fallback ---
+            # If Gymnast column is totally missing, assume it's Annabelle (prevent crash)
+            if 'Gymnast' not in df.columns:
+                df['Gymnast'] = 'Annabelle'
+            
+            # Force AA to be numeric
             if 'AA' in df.columns:
                 df['AA'] = pd.to_numeric(df['AA'], errors='coerce')
             
@@ -59,11 +75,11 @@ st.title("🏆 Sheehy All-Around")
 
 tab1, tab2, tab3 = st.tabs(["Annabelle", "Azalea", "Ansel"])
 
-# Helper function to prevent repetitive code
+# Helper function
 def show_gymnast_tab(name, color, events, header_class):
     st.markdown(f'<p class="{header_class}">{name}</p>', unsafe_allow_html=True)
     if df is not None:
-        # Filter data for this gymnast (Case insensitive)
+        # Filter logic: Look for name "Annabelle" inside the cleaned Gymnast column
         data = df[df['Gymnast'].str.contains(name, case=False, na=False)].copy()
         
         if not data.empty:
@@ -71,13 +87,11 @@ def show_gymnast_tab(name, color, events, header_class):
             latest = data.iloc[-1]
             cols = st.columns(len(events))
             for i, (event_code, icon) in enumerate(events.items()):
-                # Use .get() to safely grab data even if column is missing
                 val = latest.get(event_code, "-")
                 cols[i].metric(event_code, val)
             
             # Line Chart
             st.subheader("Season Progress")
-            # Only plot if we actually have valid AA numbers
             chart_data = data.dropna(subset=['AA'])
             
             if not chart_data.empty:
@@ -101,7 +115,5 @@ with tab2:
 
 # --- ANSEL (Teal) ---
 with tab3:
-    # Note: Ansel might need different mapping if his columns are different
     events_boys = {'FX': '🤸‍♂️', 'PH': '🐎', 'SR': '⭕', 'VT': '🏃‍♂️', 'PB': '⏸️', 'HB': '💈'}
     show_gymnast_tab("Ansel", "#008080", events_boys, "ansel-header")
-    
