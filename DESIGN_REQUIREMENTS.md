@@ -1,4 +1,4 @@
-# 📋 Sheehy All-Around - Design Requirements (v2.1)
+# 📋 Sheehy All-Around - Design Requirements (v2.2)
 
 ## **1. Core Objective**
 A unified, family-centric dashboard to track and visualize the gymnastics progress of the three Sheehy children (Annabelle, Azalea, Ansel). The app normalizes data from different organizations (Men's vs. Women's), handles historical imports, and provides context for scores.
@@ -15,7 +15,7 @@ A unified, family-centric dashboard to track and visualize the gymnastics progre
 ---
 
 ## **3. Data Pipeline & Storage**
-### **A. "Save & Scoop" Workflow (Current Standard)**
+### **A. "Save & Scoop" Workflow (Historical/Standard)**
 * **Input:** User saves athlete profile/meet result pages as `.html` files into the `ansel_history/` folder.
 * **Processor:** `process_all_history.py` scans the folder, auto-detects the gymnast, and extracts data.
 * **Storage:** Data is appended to `cleaned_gymnastics.csv`.
@@ -44,18 +44,33 @@ A unified, family-centric dashboard to track and visualize the gymnastics progre
 
 ### **B. Advanced Analytics (In Progress)**
 1.  **Event Drill-Down:**
-    * *Requirement:* Ability to click a specific event (e.g., "Beam") and see a history graph for *just* that event, distinguishing between Personal Bests (PB) and average.
+    * *Requirement:* Click specific event (e.g., "Beam") to see history graph for *just* that event.
+    * *Metric:* Compare Personal Best (PB) vs. Seasonal Average.
 2.  **Consistency Tracking:**
-    * *Requirement:* A metric (Standard Deviation) showing if a gymnast is "Stable" or "Volatile" on specific events.
+    * *Requirement:* Metric (Standard Deviation) showing "Stable" vs. "Volatile" events.
 3.  **Judge Consistency (Context):**
-    * *Requirement:* Calculate the average score of *all* gymnasts in the session to contextualize performance.
-    * *Metric:* **"Score vs. Field"** (e.g., "+0.400" means you beat the average, even if the score was low).
+    * *Requirement:* Calculate session average to contextualize performance.
+    * *Metric:* **"Score vs. Field"** (e.g., "+0.400" vs. average).
 4.  **Mobility Tracker (Future):**
-    * *Requirement:* Progress bar towards the qualifying score for the next level (e.g., "Need 36.00 AA for Level 5").
+    * *Requirement:* Progress bar towards qualifying score for next level.
 
 ---
 
-## **5. Technical Constraints**
-* **Security:** Automated scraping is blocked by cloud protection (Cloudflare). Use manual HTML saves.
+## **5. Live Tracking Mode (Real-Time)**
+* **Objective:** View scores and ranks update dynamically during a meet without manual refreshing.
+* **Trigger:** "Live Mode" toggle in the app when today's date matches a scheduled meet.
+* **Data Source (Technical Constraint):**
+    * Since MSO blocks cloud scrapers, this requires a **Local Agent** (script running on user's laptop) to fetch data and push it to the app/database every 60 seconds.
+* **Live Features:**
+    1.  **Auto-Refresh:** Dashboard updates every 30-60 seconds.
+    2.  **Dynamic Rank:** "Currently 3rd on Vault" (updates as other kids compete).
+    3.  **"Flash" Updates:** Visual indicator (Green flash) when a new score is posted.
+    4.  **Projected Finish:** "Needs a 9.4 on Floor to beat Personal Best AA."
+    5.  **Session Context:** "Current Average on Beam is 8.8 (Judges are strict today)."
+
+---
+
+## **6. Technical Constraints**
+* **Security:** Automated scraping is blocked by cloud protection (Cloudflare). Use manual HTML saves or Local Agent.
 * **Hosting:** GitHub Codespaces (Development) -> Streamlit Cloud (Production).
 * **Dependencies:** `pandas`, `beautifulsoup4`, `plotly`, `streamlit`.
