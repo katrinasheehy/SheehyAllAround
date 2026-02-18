@@ -59,6 +59,25 @@ A unified, family-centric dashboard to track and visualize gymnastics progress f
 ---
 Session Context Analytics Framework (v1.0)I. Core Analytical MetricsFor every event at every meet, the following metrics will be calculated to provide a 360-degree view of the performance:Metric 1: Session Median (The Anchor)Description: The middle value of all scores in the session/level.Purpose: Establishes the judge's baseline for the day. It accounts for "tight" vs. "loose" scoring.Metric 2: Session Max (The Ceiling)Description: The highest score awarded in that session/level.Purpose: Defines the upper limit of what the judge considered "perfection" for that specific group.Metric 3: Percentile Rank (The Magnitude)Description: The percentage of the field the child outscored (e.g., Top 10%).Purpose: Normalizes ranking across different session sizes (e.g., being 7th out of 152 is different than 7th out of 10).Metric 4: Judge Strictness Index (JSI) (The "Weather")Description: The numerical difference between the current session's median and the child’s season-long average median for that level.Purpose: Proves mathematically if the meet was "harder than usual."II. Data Hygiene & Exclusion RulesTo prevent "garbage in, garbage out" math, the following scores are excluded from group baselines:The "Scratch" Rule: All 0.0 or "DNS" scores are removed.The "Fall" Filter: Scores more than 2.5 Standard Deviations below the median are excluded. This removes "catastrophe" outliers (multiple falls/equipment failure) that don't reflect the judge's standard curve.The Self-Exclusion Rule: When calculating a baseline for your child, their own score is removed from the group to prevent "circular logic" in the comparison.III. The Meet Context Card (Visual Design)The card will use a Layered Horizontal Bullet Chart to visualize the child's place in the competitive world.Layer 1 (Background): A gray bar representing the score range (Min to Max) of the entire Level session.Layer 2 (Foreground): A colored, nested bar representing the range of the specific Age Division.Marker 1 (The Star): The child's score for that event.Marker 2 (The Line): The Division Median.Marker 3 (The Ghost Star): The child’s Personal Season Best for that event.Insight Text Generation"Ansel scored a 9.3. While this is lower than his last meet, he was in the Top 5% of this session of 152 athletes in Level 4D1, and the judge's median was 0.4 lower than average today."The Context Footer (Judge Strictness Index)Located at the bottom of the card to provide the final "verdict" on the scoring environment:Numeric: JSI: $-0.45$Descriptive: "Judge Mood: Significantly Stricter than Average"IV. Scope of AnalysisTotal Data Points: 655 rows across 9 PDF-harvested sessions (2026 Season).Discipline Handling: Parallel logic for Men’s (6 events) and Women’s (4 events).Groupings: Comparisons calculated at both the Session Level (150+ kids) and Division Level (Age-group specific).
 
+
+## Phase 2: Session Context Analytics
+
+### 1. Data Processing Logic
+- **Exclusion Rules:** - Filter all 0.0 (Scratches/DNS) from session and division baselines.
+    - Exclude "Catastrophe Outliers" (scores > 2.5 Standard Deviations below the median).
+- **Metric Definitions:**
+    - **Session Median/Max:** Calculated per Level across the entire session.
+    - **Division Median/Max:** Calculated per specific Age Group.
+    - **JSI (Judge Strictness Index):** `Current Session Median - Season Level Average Median`.
+    - **Percentile Rank:** `(Number of athletes outscored / Total active athletes in session) * 100`.
+
+### 2. UI/UX: Meet Context Cards
+- **Visuals:** Layered Bullet Charts (Plotly or Altair) displaying Session vs. Division ranges.
+- **Interactivity:**
+    - Dashboard event scores are clickable to trigger the Context Card modal.
+    - "Judge Weather" toggle on the Meet Overview page to show/hide JSI metrics.
+- **Dynamic Text:** Automated generation of the performance insight sentence.
+- 
 ## **7. Active Bug & Data Debt Tracker**
 * [ ] **Data Cleanup - Ansel:** Recent imports missing Division/Session metadata.
 * [ ] **Data Cleanup - Mardi Gras Meet:** Girls' data missing ranks and session info.
