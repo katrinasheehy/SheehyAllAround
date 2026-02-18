@@ -26,6 +26,11 @@ A unified, family-centric dashboard to track and visualize gymnastics progress f
     * **Ranks:** Each event must have a corresponding rank column (e.g., `VT_Rank`, `UB_Rank`, `AA_Rank`).
 * **Context (PLANNED):** `Session_Average`, `Session_Median`.
 
+ ### **C. Session Context Pipeline (NEW)**
+* **Objective:** Collect EVERY athlete's score for sessions attended by the Sheehy kids in 2026.
+* **Input:** Automatically derived from `cleaned_gymnastics.csv` (2026 rows).
+* **Storage:** `session_raw_data.csv` (Full session table).
+* **Validation:** Script must confirm "Athletes Found" matches "Meet_Rank_Total" from the primary CSV.
 ---
 
 ## **4. Feature Requirements**
