@@ -73,65 +73,58 @@ tab1, tab2, tab3 = st.tabs(["Annabelle", "Azalea", "Ansel"])
 def show_gymnast_tab(name, color, events, header_class):
     st.markdown(f'<p class="{header_class}">{name}</p>', unsafe_allow_html=True)
     
-    # Filter for the specific gymnast
-    # We use 'str.contains' to be safe (matches "Ansel" in "Ansel Sheehy")
-    subset = df[df['Gymnast'].astype(str).str.contains(name, case=False, na=False)].copy()
+    # --- NEW NAVIGATION LOGIC ---
+    # This adds a toggle at the top of every tab
+    show_context = st.checkbox(f"🔍 Show Judge Context & Meet History for {name}", key=f"ctx_{name}")
     
-    if not subset.empty:
-        # Get the Most Recent Meet
-        latest = subset.iloc[-1]
-        
-        # --- TOP ROW: Context ---
-        m1, m2 = st.columns([2, 1])
-        m1.info(f"📍 **Latest Meet:** {latest.get('Meet', 'Unknown')} ({latest.get('Date', '').date()})")
-        
-        # Meet Rank Badge (if available)
-        rank = latest.get('Meet_Rank', '')
-        total = latest.get('Meet_Rank_Total', '')
-        if pd.notna(rank) and str(rank) != "" and str(rank) != "0" and str(rank) != "nan":
-            rank_display = f"{int(float(rank))} / {int(float(total))}" if pd.notna(total) and total != "" else f"{int(float(rank))}"
-            m2.metric("🏆 Meet Rank", rank_display)
-        else:
-            m2.write("") # Spacer
-
-        # --- SCORES ROW ---
-        # Dynamic columns based on number of events
-        cols = st.columns(len(events))
-        for i, (evt_code, icon) in enumerate(events.items()):
-            val = latest.get(evt_code, None)
-            
-            # Formatting: If it's a number, format to 3 decimals. If NaN, show "-"
-            if pd.notna(val):
-                display_val = f"{val:.3f}"
-            else:
-                display_val = "-"
-            
-            cols[i].metric(f"{evt_code}", display_val, icon)
-            
-        # --- AA SCORE ---
-        aa_val = latest.get('AA', None)
-        if pd.notna(aa_val):
-            st.metric("All-Around (AA)", f"{aa_val:.3f}")
-            
-        # --- CHART ---
-        st.subheader("📈 Season Progress")
-        chart_data = subset.dropna(subset=['AA'])
-        if not chart_data.empty:
-            fig = px.line(chart_data, x='Date', y='AA', markers=True, 
-                          title=f"{name}'s All-Around Score Trend",
-                          color_discrete_sequence=[color])
-            fig.update_layout(yaxis_title="Score", xaxis_title="Date")
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Not enough data points for a progress chart yet.")
-
-        # --- DEBUG: RAW DATA ---
-        with st.expander(f"🔍 Inspect Raw Data for {name}"):
-            st.dataframe(subset)
-
+    if show_context:
+        # If the box is checked, show the NEW Analytics View
+        show_athlete_history(name)
     else:
-        st.info(f"No data found for {name}. Check the CSV or spelling!")
-
+        # If the box is NOT checked, show your ORIGINAL Dashboard
+        subset = df[df['Gymnast'].astype(str).str.contains(name, case=False, na=False)].copy()
+        
+        if not subset.empty:
+            # Get the Most Recent Meet
+            latest = subset.iloc[-1]
+            
+            # --- TOP ROW: Context ---
+            m1, m2 = st.columns([2, 1])
+            m1.info(f"📍 **Latest Meet:** {latest.get('Meet', 'Unknown')} ({latest.get('Date', '').date()})")
+            
+            # Meet Rank Badge
+            rank = latest.get('Meet_Rank', '')
+            total = latest.get('Meet_Rank_Total', '')
+            if pd.notna(rank) and str(rank) != "" and str(rank) != "0" and str(rank) != "nan":
+                rank_display = f"{int(float(rank))} / {int(float(total))}" if pd.notna(total) and total != "" else f"{int(float(rank))}"
+                m2.metric("🏆 Meet Rank", rank_display)
+            
+            # --- SCORES ROW ---
+            cols = st.columns(len(events))
+            for i, (evt_code, icon) in enumerate(events.items()):
+                val = latest.get(evt_code, None)
+                display_val = f"{val:.3f}" if pd.notna(val) else "-"
+                cols[i].metric(f"{evt_code}", display_val, icon)
+                
+            # --- AA SCORE ---
+            aa_val = latest.get('AA', None)
+            if pd.notna(aa_val):
+                st.metric("All-Around (AA)", f"{aa_val:.3f}")
+                
+            # --- CHART ---
+            st.subheader("📈 Season Progress")
+            chart_data = subset.dropna(subset=['AA'])
+            if not chart_data.empty:
+                fig = px.line(chart_data, x='Date', y='AA', markers=True, 
+                              title=f"{name}'s All-Around Score Trend",
+                              color_discrete_sequence=[color])
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with st.expander(f"🔍 Inspect Raw Data for {name}"):
+                st.dataframe(subset)
+        else:
+            st.info(f"No data found for {name}.")
+            
 # --- ANNABELLE (Pink) ---
 with tab1:
     events_girls = {'VT': '🏃‍♀️', 'UB': '⚖️', 'BB': '🪵', 'FX': '🤸‍♀️'}
