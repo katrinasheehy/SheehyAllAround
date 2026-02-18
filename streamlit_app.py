@@ -1,3 +1,4 @@
+from analytics_view import show_athlete_history
 import streamlit as st
 import pandas as pd
 import plotly.express as px
