@@ -1,5 +1,4 @@
-# Updating the mapping based on user's corrected IDs
-mapping_content = """# meet_mapping.py
+# meet_mapping.py
 
 # MyMeetScores (MMS) IDs for 2026 (Updated per user)
 MMS_MEET_IDS = {
@@ -9,9 +8,3 @@ MMS_MEET_IDS = {
 }
 
 # Local HTML Fallbacks for Ansel/MSO-Only (Dynamic scanning handles these in the main script)
-"""
-
-with open("meet_mapping.py", "w") as f:
-    f.write(mapping_content)
-
-print("Updated meet_mapping.py successfully.")
